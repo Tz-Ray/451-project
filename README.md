@@ -1,6 +1,6 @@
 # 451-project
 
-Smart Parking Management MVP built with Flask.
+Smart Parking Management built with Flask.
 
 ## Implemented first feature
 - Real-time availability lookup for parking slots
