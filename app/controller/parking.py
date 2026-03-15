@@ -200,3 +200,206 @@ def create_reservation():
         ),
         201,
     )
+
+
+def compute_fee(start_dt, end_dt, hourly_rate, grace_minutes=10, rounding_minutes=15, min_fee=None):
+    """
+    Calculate fee using a grace period and rounded billing blocks.
+    """
+    grace = timedelta(minutes=grace_minutes)
+    rounding = timedelta(minutes=rounding_minutes)
+    duration = max(timedelta(0), end_dt - start_dt - grace)
+
+    if duration <= timedelta(0):
+        billable = timedelta(0)
+    else:
+        blocks = -(-duration // rounding)  # ceiling division
+        billable = blocks * rounding
+
+    amount = (billable.total_seconds() / 3600) * hourly_rate
+    if min_fee is not None:
+        amount = max(amount, min_fee)
+    return round(amount, 2)
+
+
+@parking_bp.post("/sessions/checkin")
+def checkin():
+    payload = request.get_json(silent=True) or {}
+    required = ["slot_id", "vehicle_plate"]
+    missing = [f for f in required if f not in payload]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    try:
+        slot_id = int(payload.get("slot_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "slot_id must be an integer"}), 400
+
+    vehicle_plate = str(payload.get("vehicle_plate", "")).upper().strip()
+    driver_name = str(payload.get("driver_name", "")).strip() or None
+    reservation_id = payload.get("reservation_id")
+
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+
+        slot = db.execute(
+            "SELECT id, slot_number, status, hourly_rate FROM parking_slots WHERE id = ?",
+            (slot_id,),
+        ).fetchone()
+        if slot is None:
+            db.rollback()
+            return jsonify({"error": "Slot not found"}), 404
+        if slot["status"] != "available":
+            db.rollback()
+            return jsonify({"error": "Slot is not available"}), 409
+
+        active_slot = db.execute(
+            "SELECT 1 FROM parking_sessions WHERE slot_id = ? AND status = 'active' LIMIT 1",
+            (slot_id,),
+        ).fetchone()
+        if active_slot:
+            db.rollback()
+            return jsonify({"error": "Slot already has an active session"}), 409
+
+        active_vehicle = db.execute(
+            "SELECT 1 FROM parking_sessions WHERE vehicle_plate = ? AND status = 'active' LIMIT 1",
+            (vehicle_plate,),
+        ).fetchone()
+        if active_vehicle:
+            db.rollback()
+            return jsonify({"error": "Vehicle already has an active session"}), 409
+
+        now_iso = datetime.utcnow().replace(microsecond=0).isoformat()
+        res_id_to_store = None
+
+        if reservation_id is not None:
+            try:
+                reservation_id_int = int(reservation_id)
+            except (TypeError, ValueError):
+                db.rollback()
+                return jsonify({"error": "reservation_id must be an integer"}), 400
+
+            res = db.execute(
+                """
+                SELECT id, start_time, end_time, status
+                FROM reservations
+                WHERE id = ? AND slot_id = ?
+                """,
+                (reservation_id_int, slot_id),
+            ).fetchone()
+            if res is None:
+                db.rollback()
+                return jsonify({"error": "Reservation not found for this slot"}), 404
+            if res["status"] not in ("reserved", "in_use"):
+                db.rollback()
+                return jsonify({"error": "Reservation is not active"}), 409
+            if not (res["start_time"] <= now_iso <= res["end_time"]):
+                db.rollback()
+                return jsonify({"error": "Check-in outside reservation window"}), 409
+            res_id_to_store = reservation_id_int
+            db.execute(
+                "UPDATE reservations SET status = 'in_use' WHERE id = ?",
+                (reservation_id_int,),
+            )
+
+        result = db.execute(
+            """
+            INSERT INTO parking_sessions(slot_id, vehicle_plate, driver_name, check_in, status, reservation_id)
+            VALUES (?, ?, ?, ?, 'active', ?)
+            """,
+            (slot_id, vehicle_plate, driver_name, now_iso, res_id_to_store),
+        )
+        session_id = result.lastrowid
+        db.execute(
+            "UPDATE parking_slots SET status = 'occupied' WHERE id = ?",
+            (slot_id,),
+        )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return jsonify(
+        {
+            "session_id": session_id,
+            "slot_id": slot_id,
+            "vehicle_plate": vehicle_plate,
+            "check_in": now_iso,
+        }
+    ), 201
+
+
+@parking_bp.post("/sessions/checkout")
+def checkout():
+    payload = request.get_json(silent=True) or {}
+    session_id = payload.get("session_id")
+    if session_id is None:
+        return jsonify({"error": "session_id is required"}), 400
+
+    try:
+        session_id_int = int(session_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "session_id must be an integer"}), 400
+
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+
+        session = db.execute(
+            """
+            SELECT s.*, sl.hourly_rate, sl.slot_number, sl.lot_id, r.end_time AS res_end
+            FROM parking_sessions s
+            JOIN parking_slots sl ON sl.id = s.slot_id
+            LEFT JOIN reservations r ON r.id = s.reservation_id
+            WHERE s.id = ? AND s.status = 'active'
+            """,
+            (session_id_int,),
+        ).fetchone()
+
+        if session is None:
+            db.rollback()
+            return jsonify({"error": "Active session not found"}), 404
+
+        check_in_dt = datetime.fromisoformat(session["check_in"])
+        check_out_dt = datetime.utcnow().replace(microsecond=0)
+        amount = compute_fee(check_in_dt, check_out_dt, session["hourly_rate"], min_fee=session["hourly_rate"])
+
+        db.execute(
+            "UPDATE parking_sessions SET status = 'completed', check_out = ? WHERE id = ?",
+            (check_out_dt.isoformat(), session_id_int),
+        )
+        db.execute(
+            "UPDATE parking_slots SET status = 'available' WHERE id = ?",
+            (session["slot_id"],),
+        )
+        db.execute(
+            """
+            INSERT INTO payments(session_id, amount, currency, status)
+            VALUES (?, ?, 'USD', 'paid')
+            """,
+            (session_id_int, amount),
+        )
+        if session["reservation_id"]:
+            db.execute(
+                "UPDATE reservations SET status = 'completed' WHERE id = ?",
+                (session["reservation_id"],),
+            )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return jsonify(
+        {
+            "session_id": session_id_int,
+            "slot_id": session["slot_id"],
+            "vehicle_plate": session["vehicle_plate"],
+            "check_in": session["check_in"],
+            "check_out": check_out_dt.isoformat(),
+            "amount": amount,
+            "currency": "USD",
+        }
+    )
