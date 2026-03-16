@@ -1,0 +1,67 @@
+# Sprint 1 Report 
+Video Link: 
+https://youtu.be/OsOgBRgP3kE
+Github Link: https://github.com/Tz-Ray/451-project
+## What's New (User Facing)
+Admin Dashboard: View lot/slot status, basic slot management, and admin controls for parking flow.
+Check-in / Check-out flow: Admin can check vehicles in/out and the system computes parking fees.
+Slot availability + reservation core: Initial reservation/availability logic is implemented to support booking states.
+
+## Work Summary (Developer Facing)
+
+For this sprint, we implemented a Smart Parking Management System via Flask. We delivered check in/check out with fee calculations. We implemented a schema for rates/sessions/payments/reservation states. We also created a dashboard at /admin with lot/slot status, check in/check out controls, and overall basic slot management. 
+
+
+## Unfinished Work
+
+Although Sprint 1 established the project foundation, there are still several features missing. The current work is strongest on the admin-side prototype, core reservation logic, and check-in/check-out flow, but the full driver-facing experience still needs to be finished. That includes end-to-end user registration/login, role enforcement, and a polished reservation workflow are not fully implemented yet. Payment support has been partially prepared through schema and state handling, but the complete payment process and receipt/history flow still need more work. In addition, the UI needs refinement, more edge cases must be handled, and broader testing is needed to improve stability before the next sprint.
+
+## Completed Issues/User Stories
+Here are links to the issues that we completed in this sprint:
+
+View lot and slot status 
+Reserve a parking slot 
+Check in a vehicle 
+Check out a vehicle
+Calculate parking fees at check-out
+Manage lot and slot status from the admin dashboard
+
+ ## Incomplete Issues/User Stories
+ Here are links to issues we worked on but did not complete in this sprint:
+ 
+
+User registration/login
+Profile management
+Role-based access control
+View lot and slot status
+Reserve parking slot in advance
+Automated payments/payment history 
+Handle disputes/admin tracking 
+
+We did not get to these issues because of time constraint for sprint 1
+
+## Code Files for Review
+Please review the following code files, which were actively developed during this sprint, for quality:
+__init__.py(https://github.com/Tz-Ray/451-project/blob/main/app/__init__.py)
+https://github.com/Tz-Ray/451-project/blob/main/app/controller/main.py
+https://github.com/Tz-Ray/451-project/blob/main/app/controller/admin.py
+https://github.com/Tz-Ray/451-project/blob/main/app/controller/parking.py
+
+## Retrospective Summary
+Here's what went well:
+
+Designing ER model
+Creating Tables
+Created the base flow for the project for future implementation
+Creating a functional prototype for the Admin dashboard
+
+ 
+Here's what we'd like to improve:
+Completing the remaining features
+Refining the overall UI
+Finding/fixing remaining bugs
+  
+Here are changes we plan to implement in the next sprint:
+   * Touch up UI
+   * Push more code
+
