@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; }
+        h1 { margin-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .card { border: 1px solid #ccc; border-radius: 6px; padding: 12px; background: #f9f9f9; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #eee; }
+        caption { text-align: left; font-weight: bold; margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+    <p><a href="/">Back to home</a></p>
+
+    <div class="grid">
+        <div class="card"><strong>Total lots:</strong> {{ metrics.total_lots }}</div>
+        <div class="card"><strong>Total slots:</strong> {{ metrics.total_slots }}</div>
+        <div class="card"><strong>Available slots:</strong> {{ metrics.slots_available }}</div>
+        <div class="card"><strong>Occupied slots:</strong> {{ metrics.slots_occupied }}</div>
+        <div class="card"><strong>Active sessions:</strong> {{ metrics.active_sessions }}</div>
+        <div class="card"><strong>Revenue today:</strong> ${{ "%.2f"|format(metrics.revenue_today or 0) }}</div>
+    </div>
+
+    <table>
+        <caption>Lots</caption>
+        <thead>
+            <tr>
+                <th>ID</th><th>Name</th><th>Location</th><th>Capacity</th><th>Slots created</th><th>Available</th><th>Occupied</th><th>Maint</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for lot in lots %}
+            <tr>
+                <td>{{ lot.id }}</td>
+                <td>{{ lot.name }}</td>
+                <td>{{ lot.location }}</td>
+                <td>{{ lot.capacity }}</td>
+                <td>{{ lot.total_slots or 0 }}</td>
+                <td>{{ lot.available or 0 }}</td>
+                <td>{{ lot.occupied or 0 }}</td>
+                <td>{{ lot.maintenance or 0 }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="8">No lots</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <table>
+        <caption>Active sessions</caption>
+        <thead>
+            <tr>
+                <th>ID</th><th>Plate</th><th>Driver</th><th>Slot</th><th>Lot</th><th>Check-in</th><th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in active_sessions %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td>{{ s.vehicle_plate }}</td>
+                <td>{{ s.driver_name or '-' }}</td>
+                <td>{{ s.slot_number }}</td>
+                <td>{{ s.lot_name }}</td>
+                <td>{{ s.check_in }}</td>
+                <td><button class="checkout-btn" data-session="{{ s.id }}">Checkout</button></td>
+            </tr>
+        {% else %}
+            <tr><td colspan="7">No active sessions</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <section>
+        <h2>Quick check-in</h2>
+        <form id="checkin-form">
+            <label>Slot:
+                <select name="slot_id">
+                    {% for s in available_slots %}
+                        <option value="{{ s.id }}">{{ s.lot_name }} - {{ s.slot_number }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Vehicle plate: <input name="vehicle_plate" required></label>
+            <label>Driver (optional): <input name="driver_name"></label>
+            <button type="submit">Check in</button>
+            <span id="checkin-result"></span>
+        </form>
+    </section>
+
+    <section>
+        <details open id="checkout-panel">
+            <summary><strong>Quick checkout</strong></summary>
+            <form id="checkout-form" style="margin-top:8px;">
+                <label>Session ID: <input name="session_id" required></label>
+                <button type="submit">Check out</button>
+                <span id="checkout-result"></span>
+            </form>
+        </details>
+    </section>
+
+    <details open>
+        <summary><strong>Slots (manage status)</strong></summary>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th><th>Lot</th><th>Slot</th><th>Status</th><th>Rate</th><th>Set</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for s in slots %}
+                <tr>
+                    <td>{{ s.id }}</td>
+                    <td>{{ s.lot_name }}</td>
+                    <td>{{ s.slot_number }}</td>
+                    <td class="slot-status" data-slot="{{ s.id }}">{{ s.status }}</td>
+                    <td>${{ "%.2f"|format(s.hourly_rate) }}</td>
+                    <td>
+                        <select class="slot-status-select" data-slot="{{ s.id }}">
+                            <option value="available" {% if s.status == 'available' %}selected{% endif %}>available</option>
+                            <option value="occupied" {% if s.status == 'occupied' %}selected{% endif %}>occupied</option>
+                            <option value="maintenance" {% if s.status == 'maintenance' %}selected{% endif %}>maintenance</option>
+                        </select>
+                        <button class="slot-save" data-slot="{{ s.id }}">Save</button>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6">No slots</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </details>
+
+    <details open>
+        <summary><strong>Recent payments</strong></summary>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th><th>Session</th><th>Amount</th><th>Status</th><th>When</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in recent_payments %}
+                <tr>
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.session_id }}</td>
+                    <td>${{ "%.2f"|format(p.amount) }} {{ p.currency }}</td>
+                    <td>{{ p.status }}</td>
+                    <td>{{ p.created_at }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">No payments yet</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </details>
+
+    <script>
+        async function postJSON(url, data) {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            const json = await res.json().catch(() => ({}));
+            return { ok: res.ok, status: res.status, json };
+        }
+
+        const checkinForm = document.getElementById("checkin-form");
+        const checkinResult = document.getElementById("checkin-result");
+        checkinForm?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            checkinResult.textContent = "Working...";
+            const form = new FormData(checkinForm);
+            const payload = {
+                slot_id: parseInt(form.get("slot_id")),
+                vehicle_plate: form.get("vehicle_plate"),
+                driver_name: form.get("driver_name") || undefined,
+            };
+            const res = await postJSON("/api/sessions/checkin", payload);
+            checkinResult.textContent = res.ok
+                ? `Checked in: session ${res.json.session_id}`
+                : `Error (${res.status}): ${res.json.error || "unknown"}`;
+        });
+
+        const checkoutForm = document.getElementById("checkout-form");
+        const checkoutResult = document.getElementById("checkout-result");
+        checkoutForm?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            checkoutResult.textContent = "Working...";
+            const form = new FormData(checkoutForm);
+            const payload = { session_id: parseInt(form.get("session_id")) };
+            const res = await postJSON("/api/sessions/checkout", payload);
+            checkoutResult.textContent = res.ok
+                ? `Checked out: $${res.json.amount} (session ${res.json.session_id})`
+                : `Error (${res.status}): ${res.json.error || "unknown"}`;
+        });
+
+        document.querySelectorAll(".checkout-btn").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                btn.disabled = true;
+                btn.textContent = "Working...";
+                const sessionId = Number(btn.dataset.session);
+                const res = await postJSON("/api/sessions/checkout", { session_id: sessionId });
+                btn.textContent = res.ok
+                    ? `Done $${res.json.amount}`
+                    : `Err (${res.status})`;
+                if (res.ok) {
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        document.querySelectorAll(".slot-save").forEach((btn) => {
+            btn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                const slotId = btn.dataset.slot;
+                const select = document.querySelector(`.slot-status-select[data-slot='${slotId}']`);
+                const statusCell = document.querySelector(`.slot-status[data-slot='${slotId}']`);
+                btn.disabled = true;
+                btn.textContent = "Saving...";
+                const res = await postJSON(`/api/admin/slots/${slotId}/status`, { status: select.value });
+                btn.textContent = res.ok ? "Saved" : `Err (${res.status})`;
+                if (res.ok && statusCell) {
+                    statusCell.textContent = select.value;
+                }
+                setTimeout(() => location.reload(), 500);
+            });
+        });
+
+    </script>
+</body>
+</html>

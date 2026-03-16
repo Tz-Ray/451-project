@@ -10,7 +10,10 @@ def create_app():
 
     from app.controller.main import main_bp
     from app.controller.parking import parking_bp
+    from app.controller.admin import admin_bp, admin_api_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(parking_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(admin_api_bp)
 
     return app
