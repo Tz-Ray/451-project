@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from app.db import get_db
 
 parking_bp = Blueprint("parking", __name__, url_prefix="/api")
+from flask import render_template
 
 
 def parse_iso_datetime(value, field_name):
@@ -403,3 +404,28 @@ def checkout():
             "currency": "USD",
         }
     )
+
+
+@parking_bp.get("/ui")
+def ui_home():
+    return render_template("index.html")
+
+@parking_bp.get("/ui/lots")
+def ui_lots():
+    return render_template("lots.html")
+
+@parking_bp.get("/ui/slots")
+def ui_slots():
+    return render_template("slots.html")
+
+@parking_bp.get("/ui/reserve")
+def ui_reserve():
+    return render_template("reserve.html")
+
+@parking_bp.get("/ui/checkin")
+def ui_checkin():
+    return render_template("checkin.html")
+
+@parking_bp.get("/ui/checkout")
+def ui_checkout():
+    return render_template("checkout.html")

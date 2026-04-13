@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Parking Lots</h2>
+
+<button onclick="loadLots()">Load Lots</button>
+
+<ul id="lots"></ul>
+
+<script>
+async function loadLots() {
+    const res = await fetch("/api/lots");
+    const data = await res.json();
+
+    const list = document.getElementById("lots");
+    list.innerHTML = "";
+
+    data.forEach(lot => {
+        const li = document.createElement("li");
+        li.innerText = `${lot.name} - ${lot.location} (Capacity: ${lot.capacity})`;
+        list.appendChild(li);
+    });
+}
+</script>
+
+</body>
+</html>

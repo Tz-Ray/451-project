@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Available Slots</h2>
+
+Lot ID:
+<input id="lot_id"><br>
+
+Start:
+<input type="datetime-local" id="start"><br>
+
+End:
+<input type="datetime-local" id="end"><br>
+
+<button onclick="search()">Search</button>
+
+<ul id="slots"></ul>
+
+<script>
+async function search() {
+    const lot = document.getElementById("lot_id").value;
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+
+    const url = `/api/slots/available?lot_id=${lot}&start_time=${start}&end_time=${end}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const list = document.getElementById("slots");
+    list.innerHTML = "";
+
+    data.slots.forEach(s => {
+        const li = document.createElement("li");
+        li.innerText = `Slot ${s.slot_number} (${s.lot_name})`;
+        list.appendChild(li);
+    });
+}
+</script>
+
+</body>
+</html>

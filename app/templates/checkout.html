@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Checkout / Pay</h2>
+
+Session ID:
+<input id="session"><br>
+
+<button onclick="checkout()">Pay</button>
+
+<pre id="out"></pre>
+
+<script>
+async function checkout() {
+    const body = {
+        session_id: document.getElementById("session").value
+    };
+
+    const res = await fetch("/api/sessions/checkout", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    document.getElementById("out").innerText = JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>

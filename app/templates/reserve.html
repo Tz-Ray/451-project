@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Reserve Slot</h2>
+
+Slot ID: <input id="slot"><br>
+Name: <input id="name"><br>
+Plate: <input id="plate"><br>
+Start: <input type="datetime-local" id="start"><br>
+End: <input type="datetime-local" id="end"><br>
+
+<button onclick="reserve()">Reserve</button>
+
+<pre id="out"></pre>
+
+<script>
+async function reserve() {
+    const body = {
+        slot_id: document.getElementById("slot").value,
+        driver_name: document.getElementById("name").value,
+        vehicle_plate: document.getElementById("plate").value,
+        start_time: document.getElementById("start").value,
+        end_time: document.getElementById("end").value
+    };
+
+    const res = await fetch("/api/reservations", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    document.getElementById("out").innerText = JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>

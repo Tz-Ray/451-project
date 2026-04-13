@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Check-In Vehicle</h2>
+
+Slot ID: <input id="slot"><br>
+Plate: <input id="plate"><br>
+
+<button onclick="checkin()">Check In</button>
+
+<pre id="out"></pre>
+
+<script>
+async function checkin() {
+    const body = {
+        slot_id: document.getElementById("slot").value,
+        vehicle_plate: document.getElementById("plate").value
+    };
+
+    const res = await fetch("/api/sessions/checkin", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    document.getElementById("out").innerText = JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
